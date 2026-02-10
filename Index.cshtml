@@ -1,0 +1,235 @@
+﻿@page "/esportes/futebol/masculino/{des_ModalidadeUrl}/situacao"
+@model Caasp.Aplicativos.WebsiteNovo.Institucional.Pages.esportes.futebol.masculino.situacao.IndexModel
+
+
+@using static Caasp.Aplicativos.WebsiteNovo.Institucional.Util.StringUtil
+@using static Caasp.Aplicativos.WebsiteNovo.Institucional.Util.FileUtil
+@using static Caasp.Aplicativos.WebsiteNovo.Institucional.Util.DateUtil
+@using System.Globalization
+
+@{
+    ViewData["Title"] = "Inscrição";
+    var siteKey = Model._turnstileKey.SiteKey;
+    var tipoInscricao = "";
+
+
+    if (Model.Usuario?.num_TipoInscricao is int num_TipoInscricao)
+    {
+        switch (num_TipoInscricao)
+        {
+            case 1: tipoInscricao = "Definitivo"; break;
+            case 2: tipoInscricao = "Estagiário"; break;
+            case 3: tipoInscricao = "Suplementar"; break;
+            case 4: tipoInscricao = "Transferido de Outra Seccional"; break;
+            case 5: tipoInscricao = "Provisório"; break;
+            case 6: tipoInscricao = "Cons. Estrangeiro"; break;
+            case 7: tipoInscricao = "Cons. Estrangeiro Sup."; break;
+            case 8: tipoInscricao = "Funcionário"; break;
+            case 9: tipoInscricao = "Terceiro"; break;
+        }
+    }
+}
+
+@section css
+{
+    <link rel="stylesheet" href="~/lib/carousel/css/owl.carousel.min.css" />
+    <link rel="stylesheet" href="~/lib/carousel/css/owl.theme.default.min.css" />
+    <link href="~/css/pages/esportes.situacao.css" rel="stylesheet" />
+}
+
+<div class="img-main-banner-div"></div>
+<div class="container py-4">
+    <div class="text-overlay">
+        <div class="d-flex justify-content-between align-items-center">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb flex-nowrap text-truncate mb-2">
+                    <li class="breadcrumb-item"><a href="/esportes">Esportes</a></li>
+                    <li class="breadcrumb-item title-institucional">Situação inscrição</li>
+                </ol>
+            </nav>
+        </div>
+        <h3 class="caasp-title-text">Situação inscrição</h3>
+        <p class="caasp-body-text">
+            Disciplina e desafio em cada movimento.
+            Explore o universo das artes marciais da CAASP.
+        </p>
+    </div>
+</div>
+
+<div class="container py-4 mt-3">
+    @*  <p>Seu número OAB: @Model.Usuario?.num_CadastroOAB</p> *@
+
+
+
+    @Html.AntiForgeryToken()
+    @* Se não houver pré-inscrição *@
+    @if (Model.PreInscricao == null)
+    {
+        <div class="alert alert-warning">
+            Nenhuma pré-inscrição encontrada para este usuário.
+        </div>
+    }
+    else
+    {
+        @* Variáveis de controle para status e botão *@
+
+        bool mostrarBotaoPagamento = false;
+        string mensagemSituacao = "";
+        string classeAlerta = "alert-warning"; // default
+
+        if (Model.PreInscricao.flg_Status_PreInscricaoModalidade == "A")
+        {
+            mensagemSituacao = "A sua inscrição encontra-se em aberto, aguarde a aprovação do representante do time.";
+        }
+        else if (Model.PreInscricao.flg_Status_PreInscricaoModalidade == "N" || Model.PreInscricao.flg_Status_PreInscricaoModalidade == "C")
+        {
+            mensagemSituacao = "A sua inscrição foi reprovada!";
+            classeAlerta = "alert-danger";
+        }
+        else
+        {
+            if (Model.EventoInscricaoCartao != null && Model.EventoInscricaoCartao.Any(x => x.des_StatusEsitef == "CON"))
+            {
+                mensagemSituacao = "A sua inscrição foi aprovada e o pagamento confirmado com sucesso!";
+                classeAlerta = "alert-success"; 
+            }
+            else
+            {
+                mensagemSituacao = "A sua inscrição foi aprovada, porém o pagamento ainda não foi confirmado.";
+                mostrarBotaoPagamento = true;
+            }
+        }
+
+      @*   Detalhes de Pagamento *@
+        <div class="card mb-3">
+            <div class="card-header caasp-color-darker-red">
+                <b>Situação da inscrição</b>
+            </div>
+            <div class="card-body text-center">
+                <div class="alert @classeAlerta" role="alert">
+                    @mensagemSituacao
+                </div>
+
+                @if (mostrarBotaoPagamento)
+                {
+                    <button id="btnEfetuarPagamento"
+                            data-cod="@Model.PreInscricao?.cod_PreInscricao"
+                            class="btn btn-caasp-color-darker-red px-4"
+                            type="button">
+                        Verificar situação
+                    </button>
+
+                }
+            </div>
+        </div>
+
+        <!-- Detalhes do pagamento -->
+        <div class="card mb-3">
+            <div class="card-header caasp-color-darker-red">
+                <b>Detalhes do pagamento</b>
+            </div>
+            <div class="card-body">
+                @if (Model.EventoInscricaoCartao != null && Model.EventoInscricaoCartao.Any())
+                {
+                    var cartao = Model.EventoInscricaoCartao.First();
+
+                    <p><strong>Transação:</strong> @cartao.des_AutenticacaoMensagem</p>
+                    <p><strong>Bandeira:</strong> @cartao.des_Bandeira</p>
+                    <p><strong>Valor da inscrição:</strong> @(cartao.vlr_Inscricao?.ToString("C", CultureInfo.GetCultureInfo("pt-BR")) ?? "-")</p>
+                    <p><strong>Data:</strong> @(cartao.dta_Inscricao?.ToString("dd/MM/yyyy") ?? "-")</p>
+                    <p><strong>Horário do pagamento:</strong> @(cartao.dta_Inscricao?.ToString("HH:mm") ?? "-")</p>
+                    <p><strong>Status:</strong> @(cartao.flg_Status == "6" ? "Aprovado" : "Pendente")</p>
+                    <p><strong>Quantidade de parcelas:</strong> @cartao.qtd_Parcela</p>
+                    <p><strong>NIT:</strong> @cartao.des_Nit</p>
+                    <p class="d-flex justify-content-between align-items-center">
+                        <strong>Cupom:</strong>
+                        <button id="btnEmitirCupom" class="btn btn-sm caasp-color-darker-red">
+                            <span>Emitir cupom da transação</span>
+                        </button>
+                    </p>
+
+                   @* Modal*@
+                    <div class="modal fade" id="modalCupom" tabindex="-1">
+                        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Cupom da Transação</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <pre style="white-space: pre-wrap; font-family: monospace;">
+                                            @cartao.des_Cupom
+                            </pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <p>Nenhum pagamento registrado.</p>
+                }
+
+            </div>
+        </div>
+
+        <!-- Detalhes da Inscrição -->
+        <div class="card mb-3">
+            <div class="card-header caasp-color-darker-red">
+               <b> Detalhes da Inscrição</b>
+            </div>
+            <div class="card-body">
+                <p><strong>Número da inscrição:</strong> @Model.PreInscricao.cod_PreInscricao</p>
+                <p><strong>Nome:</strong> @Model.PreInscricao.nom_Nome</p>
+                <p><strong>Tipo de Inscrição:</strong> @tipoInscricao</p>
+                <p><strong>Modalidade:</strong> @Model.PreInscricao.des_Modalidade</p>
+
+                <p>
+                    <strong>Posição do jogador:</strong>
+                    @(Model.PreInscricao.cod_Posicao == 1 ? "Goleiro" : "Linha")
+                </p>
+
+                <p><strong>Valor:</strong> @(Convert.ToDecimal(Model.Modalidade.vlr_Modalidade).ToString("C", CultureInfo.GetCultureInfo("pt-BR")))</p>
+                <p><strong>Data da inscrição:</strong> @(Model.PreInscricao.dta_inscricao?.ToString("dd/MM/yyyy") ?? "-")</p>
+                <p><strong>Horário:</strong> @(Model.PreInscricao.dta_inscricao?.ToString("HH:mm") ?? "-")</p>
+                <p><strong>Status:</strong> @(Model.PreInscricao.flg_Status == "A" ? "Pendente" : "Aprovada")</p>
+            </div>
+        </div>
+
+        <!-- Informações do Evento -->
+        <div class="card mb-3">
+            <div class="card-header caasp-color-darker-red">
+               <b>Informações do Evento</b>
+            </div>
+            <div class="card-body">
+                @if (Model.Modalidade != null)
+                {
+                    <p><strong>Nome do Evento:</strong> @Model.Modalidade.des_Modalidade</p>
+                    <p><strong>Endereço:</strong> @Model.Modalidade.des_Local</p>
+                    <p><strong>Data:</strong> @Model.Modalidade.dta_Evento.ToString("dd/MM/yyyy")</p>
+                    <p><strong>Horário:</strong> @Model.Modalidade.dta_HoraEvento</p>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<div class="modal fade" id="modalPagamento" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-center p-4">
+            <h5 class="mb-3">Processando inscrição...</h5>
+
+            <!-- Spinner aqui -->
+            <div class="spinner-container">
+                <div class="spinner"></div>
+            </div>
+
+            <p class="mt-3">Isso pode levar alguns segundos, aguarde.</p>
+        </div>
+    </div>
+</div>
+
+@section scripts {
+    <script src="~/js/pages/page.esportes.situacao.js"></script>   
+
+}
